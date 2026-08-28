@@ -96,7 +96,25 @@ body {
   font-weight: 600;
 }
 
-.settings {
+.settings summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.settings[open] summary {
+  margin-bottom: 14px;
+}
+
+.summary-value {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.settings-body {
   display: grid;
   grid-template-columns: minmax(200px, 1fr) 2fr;
   gap: 20px;
@@ -486,7 +504,7 @@ kbd {
     grid-template-columns: 1fr;
   }
 
-  .settings {
+  .settings-body {
     grid-template-columns: 1fr;
   }
 }
