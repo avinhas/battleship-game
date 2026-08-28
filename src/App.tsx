@@ -1,16 +1,18 @@
-import { useEffect, useReducer } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { BoardGrid } from './components/BoardGrid'
 import { FleetPanel } from './components/FleetPanel'
 import { GameOver } from './components/GameOver'
-import { MoveLog } from './components/MoveLog'
 import { SettingsBar } from './components/SettingsBar'
 import { initialState, reducer, unplacedShips } from './game/engine'
+import { loadMuted, playEffect, saveMuted } from './sound'
 import './App.css'
 
-const AI_DELAY_MS = 650
+const AI_DELAY_MS = 700
 
 export default function App() {
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState())
+  const [muted, setMuted] = useState(loadMuted)
+  const playedSeq = useRef(0)
 
   useEffect(() => {
     if (!state.awaitingAi) return
@@ -20,17 +22,77 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === 'r' && state.phase === 'setup') {
-        dispatch({ type: 'rotate' })
-      }
+      if (event.key.toLowerCase() === 'r' && state.phase === 'setup') dispatch({ type: 'rotate' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [state.phase])
 
+  const latest = [state.lastShot.player, state.lastShot.ai]
+    .filter((event) => event !== null)
+    .sort((a, b) => b.seq - a.seq)[0]
+
+  useEffect(() => {
+    if (muted || !latest || latest.seq <= playedSeq.current) return
+    playedSeq.current = latest.seq
+    playEffect(latest.result)
+  }, [latest, muted])
+
+  useEffect(() => {
+    if (muted || !state.winner) return
+    playEffect(state.winner === 'player' ? 'win' : 'lose')
+  }, [state.winner, muted])
+
   const setup = state.phase === 'setup'
   const selectedShip = state.fleet.find((s) => s.id === state.selectedShipId) ?? null
   const remaining = unplacedShips(state)
+
+  const yourBoard = (
+    <BoardGrid
+      label="Your waters"
+      board={state.playerBoard}
+      revealShips
+      interactive={setup && Boolean(selectedShip)}
+      ghost={setup && selectedShip ? { spec: selectedShip, orientation: state.orientation } : null}
+      onCellClick={(coord) => dispatch({ type: 'place-ship', coord })}
+      pulse={state.lastShot.ai}
+    />
+  )
+
+  const enemyBoard = (
+    <BoardGrid
+      label="Enemy waters"
+      board={state.aiBoard}
+      revealShips={state.phase === 'over'}
+      interactive={state.phase === 'battle' && state.turn === 'player' && !state.awaitingAi}
+      onCellClick={(coord) => dispatch({ type: 'player-fire', coord })}
+      pulse={state.lastShot.player}
+    />
+  )
+
+  const yourColumn = (
+    <section className="board-column">
+      <h2 className="board-title">Your waters</h2>
+      {yourBoard}
+      <FleetPanel
+        title={setup ? 'Your fleet' : 'Your ships'}
+        fleet={state.fleet}
+        board={state.playerBoard}
+        selectedShipId={state.selectedShipId}
+        onSelect={(shipId) => dispatch({ type: 'select-ship', shipId })}
+        onRemove={(shipId) => dispatch({ type: 'remove-ship', shipId })}
+        setup={setup}
+      />
+    </section>
+  )
+
+  const enemyColumn = (
+    <section className="board-column">
+      <h2 className="board-title">Enemy waters</h2>
+      {enemyBoard}
+      <FleetPanel title="Enemy fleet" fleet={state.fleet} board={state.aiBoard} />
+    </section>
+  )
 
   return (
     <div className="app">
@@ -39,81 +101,69 @@ export default function App() {
         <p className="tagline">
           {setup ? 'Deploy your fleet' : state.phase === 'battle' ? 'Battle in progress' : 'Game over'}
         </p>
+        <button
+          type="button"
+          className="mute"
+          aria-pressed={muted}
+          onClick={() => {
+            const next = !muted
+            setMuted(next)
+            saveMuted(next)
+          }}
+        >
+          {muted ? 'Sound off' : 'Sound on'}
+        </button>
       </header>
 
-      <p className={`status status-${state.phase}`} role="status">
+      <p className={`status status-${latest?.result ?? 'info'}`} role="status">
         {state.message}
       </p>
 
       {setup && (
-        <SettingsBar
-          difficulty={state.difficulty}
-          onDifficulty={(difficulty) => dispatch({ type: 'set-difficulty', difficulty })}
-          fleet={state.fleet}
-          onFleet={(fleet) => dispatch({ type: 'set-fleet', fleet })}
-          locked={!setup}
-        />
-      )}
-
-      {setup && (
-        <div className="setup-controls">
-          <button type="button" onClick={() => dispatch({ type: 'rotate' })}>
-            Rotate ({state.orientation === 'horizontal' ? 'horizontal' : 'vertical'})
-          </button>
-          <button type="button" onClick={() => dispatch({ type: 'randomize' })}>
-            Randomize
-          </button>
-          <button type="button" onClick={() => dispatch({ type: 'clear' })}>
-            Clear
-          </button>
-          <button
-            type="button"
-            className="primary"
-            disabled={remaining.length > 0}
-            onClick={() => dispatch({ type: 'start-battle' })}
-          >
-            Start battle
-          </button>
-        </div>
-      )}
-
-      <main className="boards">
-        <div className="board-column">
-          <h2 className="board-title">Your waters</h2>
-          <BoardGrid
-            label="Your waters"
-            board={state.playerBoard}
-            revealShips
-            interactive={setup && Boolean(selectedShip)}
-            ghost={setup && selectedShip ? { spec: selectedShip, orientation: state.orientation } : null}
-            onCellClick={(coord) => dispatch({ type: 'place-ship', coord })}
-            lastShot={state.lastAiShot}
-          />
-          <FleetPanel
-            title={setup ? 'Your fleet' : 'Your ships'}
+        <>
+          <SettingsBar
+            difficulty={state.difficulty}
+            onDifficulty={(difficulty) => dispatch({ type: 'set-difficulty', difficulty })}
             fleet={state.fleet}
-            board={state.playerBoard}
-            selectedShipId={state.selectedShipId}
-            onSelect={(shipId) => dispatch({ type: 'select-ship', shipId })}
-            onRemove={(shipId) => dispatch({ type: 'remove-ship', shipId })}
-            setup={setup}
+            onFleet={(fleet) => dispatch({ type: 'set-fleet', fleet })}
+            locked={false}
           />
-        </div>
+          <div className="setup-controls">
+            <button type="button" onClick={() => dispatch({ type: 'rotate' })}>
+              Rotate ({state.orientation})
+            </button>
+            <button type="button" onClick={() => dispatch({ type: 'randomize' })}>
+              Randomize
+            </button>
+            <button type="button" onClick={() => dispatch({ type: 'clear' })}>
+              Clear
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={remaining.length > 0}
+              onClick={() => dispatch({ type: 'start-battle' })}
+            >
+              Start battle
+            </button>
+          </div>
+        </>
+      )}
 
-        <div className="board-column">
-          <h2 className="board-title">Enemy waters</h2>
-          <BoardGrid
-            label="Enemy waters"
-            board={state.aiBoard}
-            revealShips={state.phase === 'over'}
-            interactive={state.phase === 'battle' && state.turn === 'player' && !state.awaitingAi}
-            onCellClick={(coord) => dispatch({ type: 'player-fire', coord })}
-          />
-          <FleetPanel title="Enemy fleet" fleet={state.fleet} board={state.aiBoard} />
-        </div>
+      {/* The board you act on is the large one: yours while placing, the enemy's in battle. */}
+      <main className={`boards boards-${setup ? 'setup' : 'battle'}`}>
+        {setup ? (
+          <>
+            {yourColumn}
+            {enemyColumn}
+          </>
+        ) : (
+          <>
+            {enemyColumn}
+            {yourColumn}
+          </>
+        )}
       </main>
-
-      {state.log.length > 0 && <MoveLog log={state.log} />}
 
       {state.phase === 'over' && (
         <GameOver
@@ -124,7 +174,7 @@ export default function App() {
       )}
 
       <footer className="app-footer">
-        Press <kbd>R</kbd> to rotate during setup. Built with React + TypeScript.
+        Press <kbd>R</kbd> to rotate during setup. Ships never touch, not even diagonally.
       </footer>
     </div>
   )

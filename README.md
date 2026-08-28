@@ -9,7 +9,8 @@ A browser-playable Battleship game: you against a computer opponent. React + Typ
 - 10x10 grid, coordinates A–J / 1–10.
 - Default fleet: Carrier 5, Battleship 4, Cruiser 3, Submarine 3, Destroyer 2. Extra ships (Patrol Boat, Corvette, Dreadnought) can be toggled in before a battle starts.
 - Place ships by selecting one and clicking a cell; `R` or the Rotate button flips orientation. Randomize and Clear are available, and clicking a placed ship picks it back up.
-- You fire first; the AI replies after a short delay. Hits, misses and sunk ships are marked on both boards, with fleet panels and a battle log.
+- Ships may never touch, not even diagonally — this applies to your placements, the Randomize button and the AI's fleet.
+- You fire first; the AI replies after a short delay. Hits, misses and sunk ships are marked on both boards with splash/blast animations and sound (toggleable), plus fleet panels and a status line.
 - When a fleet is wiped out, the end screen shows turns, shots, hits, accuracy for both sides, and offers Play again (same fleet, re-randomised positions) or New setup.
 
 ## AI difficulties
@@ -37,6 +38,7 @@ Source layout:
 - `src/game/board.ts` — board, placement rules, firing, random fleet placement
 - `src/game/ai.ts` — shot selection for each difficulty
 - `src/game/engine.ts` — game state machine (setup → battle → over)
-- `src/components/` — board grid, fleet panels, log, settings, end screen
+- `src/components/` — board grid, fleet panels, settings, end screen
+- `src/sound.ts` — synthesised hit/miss/sunk effects (no audio assets)
 
 Pushing to `main` builds, lints, tests and deploys to GitHub Pages via `.github/workflows/deploy.yml`.
