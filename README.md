@@ -1,32 +1,42 @@
-# React + TypeScript + Vite
+# Battleship
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A browser-playable Battleship game: you against a computer opponent. React + TypeScript, no game-logic dependencies.
 
-Currently, two official plugins are available:
+**Play:** https://avinhas.github.io/battleship-game/
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Gameplay
 
-## React Compiler
+- 10x10 grid, coordinates A–J / 1–10.
+- Default fleet: Carrier 5, Battleship 4, Cruiser 3, Submarine 3, Destroyer 2. Extra ships (Patrol Boat, Corvette, Dreadnought) can be toggled in before a battle starts.
+- Place ships by selecting one and clicking a cell; `R` or the Rotate button flips orientation. Randomize and Clear are available, and clicking a placed ship picks it back up.
+- You fire first; the AI replies after a short delay. Hits, misses and sunk ships are marked on both boards, with fleet panels and a battle log.
+- When a fleet is wiped out, the end screen shows turns, shots, hits, accuracy for both sides, and offers Play again (same fleet, re-randomised positions) or New setup.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## AI difficulties
 
-## Expanding the Oxlint configuration
+| Level | Behaviour | Average shots to clear the default fleet (300 games) |
+| --- | --- | --- |
+| Easy | Fires at random untried cells | 95.1 |
+| Medium | Random hunt, then targets around a hit and follows the ship's axis | 51.0 |
+| Hard | Same targeting plus probability-density hunting over all remaining ship placements | 44.5 |
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+The AI only sees its own shot results — it never reads the player's ship positions.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Development
+
+```bash
+npm install     # requires Node 22+
+npm run dev     # local dev server
+npm test        # unit tests (game logic, AI, state machine)
+npm run lint
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Source layout:
+
+- `src/game/board.ts` — board, placement rules, firing, random fleet placement
+- `src/game/ai.ts` — shot selection for each difficulty
+- `src/game/engine.ts` — game state machine (setup → battle → over)
+- `src/components/` — board grid, fleet panels, log, settings, end screen
+
+Pushing to `main` builds, lints, tests and deploys to GitHub Pages via `.github/workflows/deploy.yml`.
