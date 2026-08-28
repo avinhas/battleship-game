@@ -31,7 +31,20 @@ export function inBounds(coord: Coord, size: number): boolean {
   return coord.row >= 0 && coord.row < size && coord.col >= 0 && coord.col < size
 }
 
-export type PlacementError = 'out-of-bounds' | 'overlap' | 'duplicate-ship'
+export type PlacementError = 'out-of-bounds' | 'overlap' | 'adjacent' | 'duplicate-ship'
+
+/** Every cell a ship occupies plus the ring around it, diagonals included. */
+function footprint(cells: Coord[]): Set<string> {
+  const zone = new Set<string>()
+  for (const cell of cells) {
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        zone.add(key({ row: cell.row + dr, col: cell.col + dc }))
+      }
+    }
+  }
+  return zone
+}
 
 export function validatePlacement(
   board: Board,
@@ -44,6 +57,8 @@ export function validatePlacement(
   if (cells.some((c) => !inBounds(c, board.size))) return 'out-of-bounds'
   const occupied = new Set(board.ships.flatMap((s) => s.cells).map(key))
   if (cells.some((c) => occupied.has(key(c)))) return 'overlap'
+  const buffer = footprint(board.ships.flatMap((s) => s.cells))
+  if (cells.some((c) => buffer.has(key(c)))) return 'adjacent'
   return null
 }
 
@@ -127,10 +142,12 @@ export function randomPlacement(
   size: number = BOARD_SIZE,
   rng: () => number = Math.random,
 ): Board {
-  for (let attempt = 0; attempt < 200; attempt++) {
+  // Largest ships first: they have the fewest legal spots once spacing applies.
+  const order = [...fleet].sort((a, b) => b.size - a.size)
+  for (let attempt = 0; attempt < 400; attempt++) {
     let board = createBoard(size)
     let ok = true
-    for (const spec of fleet) {
+    for (const spec of order) {
       const options: { origin: Coord; orientation: Orientation }[] = []
       for (const orientation of ['horizontal', 'vertical'] as Orientation[]) {
         const maxRow = orientation === 'vertical' ? size - spec.size : size - 1

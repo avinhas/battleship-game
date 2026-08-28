@@ -21,3 +21,11 @@ The deploy workflow ran but failed at the step that turns Pages on: the token av
 ## 5. On a phone you had to scroll past the settings to see the board
 
 End-to-end testing on a narrow screen showed the difficulty buttons and fleet chips wrapping onto four rows, pushing the boards below the fold on first load. Not broken, just annoying. The settings are now a collapsible section that starts closed on small screens and shows a one-line summary ("Medium · 5 ships").
+
+## 6. The page jumped after every shot, hiding the column letters
+
+Reported after playing the build. The battle log scrolled itself to its newest entry after each shot; the browser honours that by scrolling whatever container it has to, which in practice nudged the whole page down and pushed the board headers out of view. The log is gone now (replaced by the status line and richer board markers), and with it the auto-scroll — nothing in the app moves the viewport during battle any more.
+
+## 7. Ships could be placed nose-to-tail
+
+Placement only checked for overlap, so randomize (and manual placement) happily produced ships sitting flush against each other, which makes the board read as one big blob and skews the AI's job. Validation now also rejects anything in the one-cell ring around an existing ship, diagonals included. Two knock-on fixes: random placement now tries the biggest ships first (they run out of legal spots first, so placing them last caused needless retries), and if a fleet genuinely doesn't fit under the new rule the game says so instead of throwing — the largest selectable fleet (all eight ships) still places fine, verified over repeated runs.

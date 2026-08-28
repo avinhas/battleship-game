@@ -10,7 +10,7 @@ import {
   shipCells,
   validatePlacement,
 } from './board'
-import { DEFAULT_FLEET, type ShipSpec } from './types'
+import { DEFAULT_FLEET, EXTRA_SHIPS, type ShipSpec } from './types'
 
 const destroyer: ShipSpec = { id: 'destroyer', name: 'Destroyer', size: 2 }
 const cruiser: ShipSpec = { id: 'cruiser', name: 'Cruiser', size: 3 }
@@ -52,7 +52,16 @@ describe('placement validation', () => {
     const board = placeShip(createBoard(10), cruiser, { row: 4, col: 4 }, 'horizontal')
     expect(validatePlacement(board, destroyer, { row: 4, col: 5 }, 'vertical')).toBe('overlap')
     expect(validatePlacement(board, cruiser, { row: 0, col: 0 }, 'horizontal')).toBe('duplicate-ship')
-    expect(validatePlacement(board, destroyer, { row: 5, col: 5 }, 'vertical')).toBeNull()
+    expect(validatePlacement(board, destroyer, { row: 7, col: 7 }, 'vertical')).toBeNull()
+  })
+
+  it('rejects ships that touch, including diagonally', () => {
+    const board = placeShip(createBoard(10), cruiser, { row: 4, col: 4 }, 'horizontal')
+    expect(validatePlacement(board, destroyer, { row: 5, col: 4 }, 'horizontal')).toBe('adjacent')
+    expect(validatePlacement(board, destroyer, { row: 4, col: 7 }, 'horizontal')).toBe('adjacent')
+    expect(validatePlacement(board, destroyer, { row: 3, col: 7 }, 'vertical')).toBe('adjacent')
+    expect(validatePlacement(board, destroyer, { row: 6, col: 4 }, 'horizontal')).toBeNull()
+    expect(validatePlacement(board, destroyer, { row: 4, col: 8 }, 'horizontal')).toBeNull()
   })
 
   it('placeShip throws on invalid placement and removeShip undoes it', () => {
@@ -111,6 +120,22 @@ describe('random placement', () => {
       const cells = board.ships.flatMap((s) => s.cells)
       expect(new Set(cells.map((c) => `${c.row},${c.col}`)).size).toBe(cells.length)
       expect(cells.every((c) => c.row >= 0 && c.row < 10 && c.col >= 0 && c.col < 10)).toBe(true)
+    }
+  })
+
+  it('never places two ships touching, diagonals included', () => {
+    for (let i = 0; i < 200; i++) {
+      const board = randomPlacement([...DEFAULT_FLEET, ...EXTRA_SHIPS.slice(0, 1)], 10)
+      for (const ship of board.ships) {
+        const others = board.ships.filter((s) => s.spec.id !== ship.spec.id).flatMap((s) => s.cells)
+        for (const cell of ship.cells) {
+          for (const other of others) {
+            const touching =
+              Math.abs(cell.row - other.row) <= 1 && Math.abs(cell.col - other.col) <= 1
+            expect(touching).toBe(false)
+          }
+        }
+      }
     }
   })
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { coordLabel, isSunk, shipCells, validatePlacement } from '../game/board'
+import type { ShotEvent } from '../game/engine'
 import type { Board, Coord, Orientation, ShipSpec } from '../game/types'
 
 type Props = {
@@ -9,21 +10,14 @@ type Props = {
   interactive: boolean
   onCellClick?: (coord: Coord) => void
   ghost?: { spec: ShipSpec; orientation: Orientation } | null
-  lastShot?: Coord | null
+  /** Most recent shot on this board, replayed as a splash or blast animation. */
+  pulse?: ShotEvent | null
   label: string
 }
 
 const LETTERS = 'ABCDEFGHIJ'.split('')
 
-export function BoardGrid({
-  board,
-  revealShips,
-  interactive,
-  onCellClick,
-  ghost,
-  lastShot,
-  label,
-}: Props) {
+export function BoardGrid({ board, revealShips, interactive, onCellClick, ghost, pulse, label }: Props) {
   const [hover, setHover] = useState<Coord | null>(null)
 
   const shipCellMap = new Map<string, { name: string; sunk: boolean }>()
@@ -60,31 +54,29 @@ export function BoardGrid({
               const k = `${row},${col}`
               const shot = board.shots[row][col]
               const ship = shipCellMap.get(k)
+              const pulsed = pulse && pulse.coord.row === row && pulse.coord.col === col
               const classes = ['cell']
               if (ship) classes.push(ship.sunk ? 'cell-sunk-ship' : 'cell-ship')
               if (shot === 'miss') classes.push('cell-miss')
               if (shot === 'hit') classes.push('cell-hit')
               if (shot === 'sunk') classes.push('cell-sunk')
               if (ghostCells.has(k)) classes.push(ghostValid ? 'cell-ghost' : 'cell-ghost-bad')
-              if (lastShot && lastShot.row === row && lastShot.col === col) {
-                classes.push('cell-last')
-              }
+              if (pulsed) classes.push(`cell-pulse cell-pulse-${pulse.result}`)
               const coord = { row, col }
               const disabled = !interactive || (!ghost && shot !== 'empty')
               return (
                 <button
-                  key={k}
+                  key={pulsed ? `${k}-${pulse.seq}` : k}
                   type="button"
                   className={classes.join(' ')}
                   disabled={disabled}
-                  aria-label={`${label} ${coordLabel(coord)}${
-                    shot === 'empty' ? '' : ` ${shot}`
-                  }`}
+                  aria-label={`${label} ${coordLabel(coord)}${shot === 'empty' ? '' : ` ${shot}`}`}
                   onClick={() => onCellClick?.(coord)}
                   onMouseEnter={() => ghost && setHover(coord)}
                   onMouseLeave={() => ghost && setHover(null)}
                 >
                   <span className="marker" />
+                  {pulsed && <span className="splash" aria-hidden />}
                 </button>
               )
             })}

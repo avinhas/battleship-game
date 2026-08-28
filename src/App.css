@@ -73,6 +73,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
+  transition: border-left-color 0.2s ease;
   border-radius: var(--radius);
   font-size: 0.95rem;
   min-height: 44px;
@@ -207,11 +208,24 @@ button.primary {
   gap: 8px;
 }
 
+/* The board being acted on gets the space; the other rides alongside, smaller. */
 .boards {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 20px;
   align-items: start;
+}
+
+.boards-setup {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.boards-battle {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.boards > .board-column:last-child .board-title {
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .board-column {
@@ -310,8 +324,117 @@ button.primary {
   background: color-mix(in srgb, var(--hit) 45%, var(--surface-2));
 }
 
-.cell-last {
-  border-color: var(--accent);
+.status-hit {
+  border-left-color: var(--hit);
+}
+
+.status-sunk {
+  border-left-color: var(--sunk);
+  font-weight: 600;
+}
+
+.status-miss {
+  border-left-color: var(--miss);
+}
+
+.splash {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.cell {
+  position: relative;
+  overflow: hidden;
+}
+
+.cell-pulse .marker {
+  animation: marker-pop 0.35s ease-out both;
+}
+
+.cell-pulse-miss .splash {
+  animation: ripple 0.6s ease-out forwards;
+  border: 2px solid var(--miss);
+}
+
+.cell-pulse-hit .splash,
+.cell-pulse-sunk .splash {
+  animation: blast 0.55s ease-out forwards;
+  background: radial-gradient(circle, #fff59d 0%, var(--hit) 45%, transparent 70%);
+}
+
+.cell-pulse-hit {
+  animation: shake 0.4s ease-in-out;
+}
+
+.cell-pulse-sunk {
+  animation: shake 0.6s ease-in-out;
+}
+
+.cell-pulse-sunk .splash {
+  animation-duration: 0.9s;
+}
+
+@keyframes marker-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.2);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+@keyframes blast {
+  0% {
+    transform: scale(0.2);
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-1.5px, 1px);
+  }
+  50% {
+    transform: translate(1.5px, -1px);
+  }
+  75% {
+    transform: translate(-1px, -1px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cell-pulse,
+  .cell-pulse .marker,
+  .splash {
+    animation: none !important;
+  }
 }
 
 .cell:not(:disabled):hover {
@@ -381,43 +504,11 @@ button.primary {
   border-color: var(--hit);
 }
 
-.log-panel {
-  max-height: 220px;
-  overflow-y: auto;
-}
-
-.log-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 4px;
-  font-size: 0.85rem;
-}
-
-.log-item {
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: var(--surface-2);
-  border-left: 3px solid var(--line);
-}
-
-.log-hit {
-  border-left-color: var(--hit);
-}
-
-.log-sunk {
-  border-left-color: var(--sunk);
-  font-weight: 600;
-}
-
-.log-miss {
-  border-left-color: var(--miss);
-}
-
-.log-info {
-  border-left-color: var(--accent);
+.mute {
+  margin-left: auto;
+  font-size: 0.8rem;
+  padding: 6px 12px;
+  min-height: 34px;
 }
 
 .overlay {
@@ -500,7 +591,8 @@ kbd {
 }
 
 @media (max-width: 860px) {
-  .boards {
+  .boards-setup,
+  .boards-battle {
     grid-template-columns: 1fr;
   }
 

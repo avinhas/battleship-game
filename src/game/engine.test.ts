@@ -30,6 +30,11 @@ describe('setup phase', () => {
     state = reducer(initialState(), { type: 'place-ship', coord: { row: 0, col: 0 } })
     state = reducer(state, { type: 'place-ship', coord: { row: 0, col: 1 } })
     expect(state.message).toMatch(/overlap/i)
+
+    state = reducer(initialState(), { type: 'place-ship', coord: { row: 0, col: 0 } })
+    state = reducer(state, { type: 'place-ship', coord: { row: 1, col: 5 } })
+    expect(state.message).toMatch(/cannot touch/i)
+    expect(state.playerBoard.ships).toHaveLength(1)
   })
 
   it('rotates the placement orientation', () => {
@@ -76,7 +81,8 @@ describe('battle phase', () => {
     expect(state.stats.player.shots).toBe(1)
     expect(state.turn).toBe('ai')
     expect(state.awaitingAi).toBe(true)
-    expect(state.log.at(-1)!.text).toMatch(/^You fired at A1/)
+    expect(state.message).toMatch(/^A1 —/)
+    expect(state.lastShot.player).toMatchObject({ side: 'player', coord: { row: 0, col: 0 } })
   })
 
   it('ignores clicks on an already-shot cell and out-of-turn shots', () => {
@@ -94,7 +100,8 @@ describe('battle phase', () => {
     expect(state.stats.ai.shots).toBe(1)
     expect(state.turn).toBe('player')
     expect(state.awaitingAi).toBe(false)
-    expect(state.lastAiShot).not.toBeNull()
+    expect(state.lastShot.ai).not.toBeNull()
+    expect(state.lastShot.ai!.seq).toBeGreaterThan(state.lastShot.player!.seq)
   })
 
   it('ends the game when a fleet is wiped out', () => {
@@ -108,7 +115,7 @@ describe('battle phase', () => {
     }
     expect(state.phase).toBe('over')
     expect(state.winner).toBe('player')
-    expect(state.log.at(-1)!.text).toMatch(/sank the enemy/i)
+    expect(state.message).toMatch(/victory/i)
   })
 
   it('freezes the game once it is over', () => {

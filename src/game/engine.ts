@@ -12,11 +12,12 @@ import {
 export type Phase = 'setup' | 'battle' | 'over'
 export type Side = 'player' | 'ai'
 
-export type LogEntry = {
-  id: number
+/** The most recent resolved shot, used to drive board animations and sound. */
+export type ShotEvent = {
+  seq: number
   side: Side
-  text: string
-  kind: 'miss' | 'hit' | 'sunk' | 'info'
+  coord: Coord
+  result: 'miss' | 'hit' | 'sunk'
 }
 
 export type Stats = {
@@ -33,13 +34,12 @@ export type GameState = {
   turn: Side
   /** Set while the AI's reply is pending so the UI can lock input. */
   awaitingAi: boolean
-  log: LogEntry[]
   stats: Record<Side, Stats>
   winner: Side | null
   selectedShipId: string | null
   orientation: Orientation
   message: string
-  lastAiShot: Coord | null
+  lastShot: Record<Side, ShotEvent | null>
 }
 
 export type Action =
@@ -57,10 +57,16 @@ export type Action =
   | { type: 'play-again' }
   | { type: 'new-setup' }
 
-let logId = 0
+let shotSeq = 0
 
-function entry(side: Side, kind: LogEntry['kind'], text: string): LogEntry {
-  return { id: ++logId, side, kind, text }
+const CROWDED = 'That fleet is too crowded for a 10x10 board — remove a ship.'
+
+function safeRandom(fleet: ShipSpec[]): Board | null {
+  try {
+    return randomPlacement(fleet, BOARD_SIZE)
+  } catch {
+    return null
+  }
 }
 
 export function initialState(fleet: ShipSpec[] = DEFAULT_FLEET): GameState {
@@ -72,13 +78,12 @@ export function initialState(fleet: ShipSpec[] = DEFAULT_FLEET): GameState {
     aiBoard: createBoard(BOARD_SIZE),
     turn: 'player',
     awaitingAi: false,
-    log: [],
     stats: { player: { shots: 0, hits: 0 }, ai: { shots: 0, hits: 0 } },
     winner: null,
     selectedShipId: fleet[0]?.id ?? null,
     orientation: 'horizontal',
     message: 'Place your fleet to begin.',
-    lastAiShot: null,
+    lastShot: { player: null, ai: null },
   }
 }
 
@@ -120,13 +125,13 @@ export function reducer(state: GameState, action: Action): GameState {
       if (!spec) return state
       const error = validatePlacement(state.playerBoard, spec, action.coord, state.orientation)
       if (error) {
-        return {
-          ...state,
-          message:
-            error === 'overlap'
-              ? `${spec.name} would overlap another ship.`
-              : `${spec.name} does not fit there.`,
+        const reason: Record<typeof error, string> = {
+          overlap: `${spec.name} would overlap another ship.`,
+          adjacent: `Ships cannot touch — leave a gap around the ${spec.name}.`,
+          'out-of-bounds': `${spec.name} does not fit there.`,
+          'duplicate-ship': `${spec.name} is already placed.`,
         }
+        return { ...state, message: reason[error] }
       }
       const playerBoard = placeShip(state.playerBoard, spec, action.coord, state.orientation)
       const selectedShipId = nextSelection(state, playerBoard)
@@ -148,9 +153,11 @@ export function reducer(state: GameState, action: Action): GameState {
 
     case 'randomize': {
       if (state.phase !== 'setup') return state
+      const playerBoard = safeRandom(state.fleet)
+      if (!playerBoard) return { ...state, message: CROWDED }
       return {
         ...state,
-        playerBoard: randomPlacement(state.fleet, BOARD_SIZE),
+        playerBoard,
         selectedShipId: null,
         message: 'Fleet ready. Start the battle!',
       }
@@ -168,13 +175,14 @@ export function reducer(state: GameState, action: Action): GameState {
 
     case 'start-battle': {
       if (state.phase !== 'setup' || unplacedShips(state).length > 0) return state
+      const aiBoard = safeRandom(state.fleet)
+      if (!aiBoard) return { ...state, message: CROWDED }
       return {
         ...state,
         phase: 'battle',
-        aiBoard: randomPlacement(state.fleet, BOARD_SIZE),
+        aiBoard,
         turn: 'player',
-        message: 'Your move — fire at the enemy waters.',
-        log: [entry('player', 'info', 'Battle stations! You fire first.')],
+        message: 'Battle stations! Fire at the enemy waters.',
       }
     }
 
@@ -186,10 +194,16 @@ export function reducer(state: GameState, action: Action): GameState {
       const hit = outcome.result !== 'miss'
       const text =
         outcome.result === 'sunk'
-          ? `You fired at ${label} — sank the enemy ${outcome.ship!.spec.name}!`
+          ? `${label} — you sank the enemy ${outcome.ship!.spec.name}!`
           : outcome.result === 'hit'
-            ? `You fired at ${label} — hit!`
-            : `You fired at ${label} — miss.`
+            ? `${label} — hit!`
+            : `${label} — miss.`
+      const event: ShotEvent = {
+        seq: ++shotSeq,
+        side: 'player',
+        coord: action.coord,
+        result: outcome.result,
+      }
       const stats = {
         ...state.stats,
         player: {
@@ -205,7 +219,7 @@ export function reducer(state: GameState, action: Action): GameState {
           phase: 'over',
           winner: 'player',
           message: 'Victory! The enemy fleet is destroyed.',
-          log: [...state.log, entry('player', outcome.result, text)],
+          lastShot: { ...state.lastShot, player: event },
         }
       }
       return {
@@ -215,7 +229,7 @@ export function reducer(state: GameState, action: Action): GameState {
         turn: 'ai',
         awaitingAi: true,
         message: text,
-        log: [...state.log, entry('player', outcome.result, text)],
+        lastShot: { ...state.lastShot, player: event },
       }
     }
 
@@ -229,10 +243,11 @@ export function reducer(state: GameState, action: Action): GameState {
       const hit = outcome.result !== 'miss'
       const text =
         outcome.result === 'sunk'
-          ? `Enemy fired at ${label} — sank your ${outcome.ship!.spec.name}!`
+          ? `Enemy hit ${label} and sank your ${outcome.ship!.spec.name}!`
           : outcome.result === 'hit'
-            ? `Enemy fired at ${label} — hit!`
-            : `Enemy fired at ${label} — miss.`
+            ? `Enemy hit your ship at ${label}.`
+            : `Enemy missed at ${label}.`
+      const event: ShotEvent = { seq: ++shotSeq, side: 'ai', coord, result: outcome.result }
       const stats = {
         ...state.stats,
         ai: { shots: state.stats.ai.shots + 1, hits: state.stats.ai.hits + (hit ? 1 : 0) },
@@ -245,9 +260,8 @@ export function reducer(state: GameState, action: Action): GameState {
           phase: 'over',
           winner: 'ai',
           awaitingAi: false,
-          lastAiShot: coord,
+          lastShot: { ...state.lastShot, ai: event },
           message: 'Defeat — your fleet has been sunk.',
-          log: [...state.log, entry('ai', outcome.result, text)],
         }
       }
       return {
@@ -256,20 +270,20 @@ export function reducer(state: GameState, action: Action): GameState {
         stats,
         turn: 'player',
         awaitingAi: false,
-        lastAiShot: coord,
+        lastShot: { ...state.lastShot, ai: event },
         message: `${text} Your move.`,
-        log: [...state.log, entry('ai', outcome.result, text)],
       }
     }
 
     case 'play-again': {
       const fresh = initialState(state.fleet)
+      const playerBoard = safeRandom(state.fleet)
       return {
         ...fresh,
         difficulty: state.difficulty,
-        playerBoard: randomPlacement(state.fleet, BOARD_SIZE),
+        playerBoard: playerBoard ?? fresh.playerBoard,
         phase: 'setup',
-        selectedShipId: null,
+        selectedShipId: playerBoard ? null : fresh.selectedShipId,
         message: 'Same fleet, new positions. Adjust or start the battle.',
       }
     }
