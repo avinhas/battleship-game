@@ -9,13 +9,22 @@ const FOCUSABLE =
  */
 export function useDialog(onDismiss: () => void) {
   const ref = useRef<HTMLDivElement>(null)
+  const opener = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    ref.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
-    // The opener is still inert when this cleanup runs, so restore on the next frame.
+    const dialog = ref.current
+    const active = document.activeElement
+    // Ignore re-entry (StrictMode remounts the effect): the opener is never inside the dialog.
+    if (active instanceof HTMLElement && !dialog?.contains(active)) opener.current = active
+    dialog?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
     return () => {
-      if (opener) requestAnimationFrame(() => opener.focus())
+      const target = opener.current
+      // Next frame: the page has left `inert`, and a still-connected dialog means
+      // this was a remount rather than a real close.
+      requestAnimationFrame(() => {
+        if (dialog?.isConnected) return
+        target?.focus()
+      })
     }
   }, [])
 
