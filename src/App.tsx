@@ -2,9 +2,11 @@ import { useEffect, useReducer, useRef, useState } from 'react'
 import { BoardGrid } from './components/BoardGrid'
 import { FleetPanel } from './components/FleetPanel'
 import { GameOver } from './components/GameOver'
+import { HistoryModal } from './components/HistoryModal'
+import { RulesModal } from './components/RulesModal'
 import { SettingsBar } from './components/SettingsBar'
 import { initialState, reducer, unplacedShips } from './game/engine'
-import { loadMuted, playEffect, saveMuted } from './sound'
+import { loadMuted, loadRulesDismissed, playEffect, saveMuted } from './sound'
 import './App.css'
 
 const AI_DELAY_MS = 700
@@ -12,7 +14,10 @@ const AI_DELAY_MS = 700
 export default function App() {
   const [state, dispatch] = useReducer(reducer, undefined, () => initialState())
   const [muted, setMuted] = useState(loadMuted)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(() => !loadRulesDismissed())
   const playedSeq = useRef(0)
+  const modalOpen = historyOpen || rulesOpen
 
   useEffect(() => {
     if (!state.awaitingAi) return
@@ -22,11 +27,12 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (modalOpen) return
       if (event.key.toLowerCase() === 'r' && state.phase === 'setup') dispatch({ type: 'rotate' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [state.phase])
+  }, [state.phase, modalOpen])
 
   const latest = [state.lastShot.player, state.lastShot.ai]
     .filter((event) => event !== null)
@@ -96,86 +102,106 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Battleship</h1>
-        <p className="tagline">
-          {setup ? 'Deploy your fleet' : state.phase === 'battle' ? 'Battle in progress' : 'Game over'}
-        </p>
-        <button
-          type="button"
-          className="mute"
-          aria-pressed={muted}
-          onClick={() => {
-            const next = !muted
-            setMuted(next)
-            saveMuted(next)
-          }}
-        >
-          {muted ? 'Sound off' : 'Sound on'}
-        </button>
-      </header>
+      {/* Everything the open dialog covers is inert: no focus, no clicks, no shortcuts. */}
+      <div className="app-content" inert={modalOpen}>
+        <header className="app-header">
+          <h1>Battleship</h1>
+          <p className="tagline">
+            {setup ? 'Deploy your fleet' : state.phase === 'battle' ? 'Battle in progress' : 'Game over'}
+          </p>
+          <button
+            type="button"
+            className="mute"
+            aria-pressed={muted}
+            onClick={() => {
+              const next = !muted
+              setMuted(next)
+              saveMuted(next)
+            }}
+          >
+            {muted ? 'Sound off' : 'Sound on'}
+          </button>
+          <button type="button" className="header-action" onClick={() => setRulesOpen(true)}>
+            How to play
+          </button>
+        </header>
 
-      <p className={`status status-${latest?.result ?? 'info'}`} role="status">
-        {state.message}
-      </p>
+        <div className="status-row">
+          <p className={`status status-${latest?.result ?? 'info'}`} role="status">
+            {state.message}
+          </p>
+          {!setup && (
+            <button type="button" onClick={() => setHistoryOpen(true)}>
+              History
+            </button>
+          )}
+        </div>
 
-      {setup && (
-        <>
-          <SettingsBar
-            difficulty={state.difficulty}
-            onDifficulty={(difficulty) => dispatch({ type: 'set-difficulty', difficulty })}
-            fleet={state.fleet}
-            onFleet={(fleet) => dispatch({ type: 'set-fleet', fleet })}
-            locked={false}
-          />
-          <div className="setup-controls">
-            <button type="button" onClick={() => dispatch({ type: 'rotate' })}>
-              Rotate ({state.orientation})
-            </button>
-            <button type="button" onClick={() => dispatch({ type: 'randomize' })}>
-              Randomize
-            </button>
-            <button type="button" onClick={() => dispatch({ type: 'clear' })}>
-              Clear
-            </button>
-            <button
-              type="button"
-              className="primary"
-              disabled={remaining.length > 0}
-              onClick={() => dispatch({ type: 'start-battle' })}
-            >
-              Start battle
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* The board you act on is the large one: yours while placing, the enemy's in battle. */}
-      <main className={`boards boards-${setup ? 'setup' : 'battle'}`}>
-        {setup ? (
+        {setup && (
           <>
-            {yourColumn}
-            {enemyColumn}
-          </>
-        ) : (
-          <>
-            {enemyColumn}
-            {yourColumn}
+            <SettingsBar
+              difficulty={state.difficulty}
+              onDifficulty={(difficulty) => dispatch({ type: 'set-difficulty', difficulty })}
+              fleet={state.fleet}
+              onFleet={(fleet) => dispatch({ type: 'set-fleet', fleet })}
+              locked={false}
+            />
+            <div className="setup-controls">
+              <button type="button" onClick={() => dispatch({ type: 'rotate' })}>
+                Rotate ({state.orientation})
+              </button>
+              <button type="button" onClick={() => dispatch({ type: 'randomize' })}>
+                Randomize
+              </button>
+              <button type="button" onClick={() => dispatch({ type: 'clear' })}>
+                Clear
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={remaining.length > 0}
+                onClick={() => dispatch({ type: 'start-battle' })}
+              >
+                Start battle
+              </button>
+            </div>
           </>
         )}
-      </main>
 
-      {state.phase === 'over' && (
-        <GameOver
-          state={state}
-          onPlayAgain={() => dispatch({ type: 'play-again' })}
-          onNewSetup={() => dispatch({ type: 'new-setup' })}
-        />
-      )}
+        {/* The board you act on is the large one: yours while placing, the enemy's in battle. */}
+        <main className={`boards boards-${setup ? 'setup' : 'battle'}`}>
+          {setup ? (
+            <>
+              {yourColumn}
+              {enemyColumn}
+            </>
+          ) : (
+            <>
+              {enemyColumn}
+              {yourColumn}
+            </>
+          )}
+        </main>
 
-      <footer className="app-footer">
-        Press <kbd>R</kbd> to rotate during setup. Ships never touch, not even diagonally.
-      </footer>
+        <footer className="app-footer">
+          Press <kbd>R</kbd> to rotate during setup, <kbd>↑↓←→</kbd> to move across a grid and{' '}
+          <kbd>Enter</kbd> to fire. Ships never touch, not even diagonally. Open <b>History</b> for past
+          shots or <b>How to play</b> for the rules.
+        </footer>
+
+        {state.phase === 'over' && (
+          <GameOver
+            state={state}
+            onPlayAgain={() => dispatch({ type: 'play-again' })}
+            onNewSetup={() => dispatch({ type: 'new-setup' })}
+            onShowHistory={() => setHistoryOpen(true)}
+          />
+        )}
+      </div>
+
+      {historyOpen && <HistoryModal history={state.history} onClose={() => setHistoryOpen(false)} />}
+
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
     </div>
   )
 }

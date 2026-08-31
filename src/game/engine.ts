@@ -18,6 +18,8 @@ export type ShotEvent = {
   side: Side
   coord: Coord
   result: 'miss' | 'hit' | 'sunk'
+  /** Name of the ship destroyed by this shot, set only when result is 'sunk'. */
+  shipName?: string
 }
 
 export type Stats = {
@@ -40,6 +42,7 @@ export type GameState = {
   orientation: Orientation
   message: string
   lastShot: Record<Side, ShotEvent | null>
+  history: ShotEvent[]
 }
 
 export type Action =
@@ -84,6 +87,7 @@ export function initialState(fleet: ShipSpec[] = DEFAULT_FLEET): GameState {
     orientation: 'horizontal',
     message: 'Place your fleet to begin.',
     lastShot: { player: null, ai: null },
+    history: [],
   }
 }
 
@@ -203,6 +207,7 @@ export function reducer(state: GameState, action: Action): GameState {
         side: 'player',
         coord: action.coord,
         result: outcome.result,
+        ...(outcome.result === 'sunk' ? { shipName: outcome.ship!.spec.name } : {}),
       }
       const stats = {
         ...state.stats,
@@ -220,6 +225,7 @@ export function reducer(state: GameState, action: Action): GameState {
           winner: 'player',
           message: 'Victory! The enemy fleet is destroyed.',
           lastShot: { ...state.lastShot, player: event },
+          history: [...state.history, event],
         }
       }
       return {
@@ -230,6 +236,7 @@ export function reducer(state: GameState, action: Action): GameState {
         awaitingAi: true,
         message: text,
         lastShot: { ...state.lastShot, player: event },
+        history: [...state.history, event],
       }
     }
 
@@ -247,7 +254,13 @@ export function reducer(state: GameState, action: Action): GameState {
           : outcome.result === 'hit'
             ? `Enemy hit your ship at ${label}.`
             : `Enemy missed at ${label}.`
-      const event: ShotEvent = { seq: ++shotSeq, side: 'ai', coord, result: outcome.result }
+      const event: ShotEvent = {
+        seq: ++shotSeq,
+        side: 'ai',
+        coord,
+        result: outcome.result,
+        ...(outcome.result === 'sunk' ? { shipName: outcome.ship!.spec.name } : {}),
+      }
       const stats = {
         ...state.stats,
         ai: { shots: state.stats.ai.shots + 1, hits: state.stats.ai.hits + (hit ? 1 : 0) },
@@ -261,6 +274,7 @@ export function reducer(state: GameState, action: Action): GameState {
           winner: 'ai',
           awaitingAi: false,
           lastShot: { ...state.lastShot, ai: event },
+          history: [...state.history, event],
           message: 'Defeat — your fleet has been sunk.',
         }
       }
@@ -271,6 +285,7 @@ export function reducer(state: GameState, action: Action): GameState {
         turn: 'player',
         awaitingAi: false,
         lastShot: { ...state.lastShot, ai: event },
+        history: [...state.history, event],
         message: `${text} Your move.`,
       }
     }
