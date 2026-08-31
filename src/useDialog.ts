@@ -13,7 +13,10 @@ export function useDialog(onDismiss: () => void) {
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     ref.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus()
-    return () => opener?.focus()
+    // The opener is still inert when this cleanup runs, so restore on the next frame.
+    return () => {
+      if (opener) requestAnimationFrame(() => opener.focus())
+    }
   }, [])
 
   const onKeyDown = useCallback(
