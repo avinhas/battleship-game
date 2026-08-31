@@ -1,6 +1,6 @@
-import { useEffect } from 'react'
 import { coordLabel } from '../game/board'
 import type { ShotEvent } from '../game/engine'
+import { useDialog } from '../useDialog'
 
 type Props = {
   history: ShotEvent[]
@@ -33,13 +33,7 @@ function ShotList({ title, shots, empty }: { title: string; shots: ShotEvent[]; 
 }
 
 export function HistoryModal({ history, onClose }: Props) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const { ref, onKeyDown } = useDialog(onClose)
 
   const ordered = [...history].sort((a, b) => a.seq - b.seq)
   const yours = ordered.filter((event) => event.side === 'player')
@@ -51,6 +45,8 @@ export function HistoryModal({ history, onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label="Shot history"
+      ref={ref}
+      onKeyDown={onKeyDown}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
@@ -62,7 +58,7 @@ export function HistoryModal({ history, onClose }: Props) {
           <ShotList title="Enemy shots" shots={enemy} empty="The enemy has not fired yet." />
         </div>
         <div className="overlay-actions">
-          <button type="button" className="primary" autoFocus onClick={onClose}>
+          <button type="button" className="primary" onClick={onClose}>
             Close
           </button>
         </div>

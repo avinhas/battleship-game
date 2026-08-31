@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { saveRulesDismissed } from '../sound'
+import { useDialog } from '../useDialog'
 
 type Props = {
   onClose: () => void
@@ -20,13 +21,7 @@ export function RulesModal({ onClose }: Props) {
     onClose()
   }, [dontShowAgain, onClose])
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [close])
+  const { ref, onKeyDown } = useDialog(close)
 
   return (
     <div
@@ -34,6 +29,8 @@ export function RulesModal({ onClose }: Props) {
       role="dialog"
       aria-modal="true"
       aria-label="How to play"
+      ref={ref}
+      onKeyDown={onKeyDown}
       onClick={(event) => {
         if (event.target === event.currentTarget) close()
       }}
@@ -76,7 +73,7 @@ export function RulesModal({ onClose }: Props) {
         </label>
 
         <div className="overlay-actions">
-          <button type="button" className="primary" autoFocus onClick={close}>
+          <button type="button" className="primary" onClick={close}>
             Got it
           </button>
         </div>

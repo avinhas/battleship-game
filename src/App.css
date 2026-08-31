@@ -47,6 +47,11 @@ body {
   gap: 16px;
 }
 
+/* Layout-neutral wrapper so the page can be made inert behind a dialog. */
+.app-content {
+  display: contents;
+}
+
 .app-header {
   display: flex;
   align-items: baseline;
