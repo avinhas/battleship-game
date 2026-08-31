@@ -90,7 +90,7 @@ export function BoardGrid({ board, revealShips, interactive, onCellClick, ghost,
               const disabled = !interactive || (!ghost && shot !== 'empty')
               return (
                 <button
-                  key={pulsed ? `${k}-${pulse.seq}` : k}
+                  key={k}
                   type="button"
                   className={classes.join(' ')}
                   ref={(node) => {
@@ -109,8 +109,9 @@ export function BoardGrid({ board, revealShips, interactive, onCellClick, ghost,
                   onMouseEnter={() => ghost && setHover(coord)}
                   onMouseLeave={() => ghost && setHover(null)}
                 >
-                  <span className="marker" />
-                  {pulsed && <span className="splash" aria-hidden />}
+                  {/* Keyed by shot so the animations replay without remounting the focusable cell. */}
+                  <span key={pulsed ? `marker-${pulse.seq}` : 'marker'} className="marker" />
+                  {pulsed && <span key={`splash-${pulse.seq}`} className="splash" aria-hidden />}
                 </button>
               )
             })}
