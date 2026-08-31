@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { coordLabel, isSunk, shipCells, validatePlacement } from '../game/board'
 import type { ShotEvent } from '../game/engine'
 import type { Board, Coord, Orientation, ShipSpec } from '../game/types'
@@ -19,6 +19,30 @@ const LETTERS = 'ABCDEFGHIJ'.split('')
 
 export function BoardGrid({ board, revealShips, interactive, onCellClick, ghost, pulse, label }: Props) {
   const [hover, setHover] = useState<Coord | null>(null)
+  const [focused, setFocused] = useState<Coord>({ row: 0, col: 0 })
+  const cellRefs = useRef(new Map<string, HTMLButtonElement>())
+
+  const moveFocus = (coord: Coord) => {
+    const row = Math.min(Math.max(coord.row, 0), board.size - 1)
+    const col = Math.min(Math.max(coord.col, 0), board.size - 1)
+    setFocused({ row, col })
+    cellRefs.current.get(`${row},${col}`)?.focus()
+  }
+
+  const onKeyDown = (event: React.KeyboardEvent, coord: Coord) => {
+    const moves: Record<string, Coord> = {
+      ArrowUp: { row: coord.row - 1, col: coord.col },
+      ArrowDown: { row: coord.row + 1, col: coord.col },
+      ArrowLeft: { row: coord.row, col: coord.col - 1 },
+      ArrowRight: { row: coord.row, col: coord.col + 1 },
+      Home: { row: coord.row, col: 0 },
+      End: { row: coord.row, col: board.size - 1 },
+    }
+    const target = moves[event.key]
+    if (!target) return
+    event.preventDefault()
+    moveFocus(target)
+  }
 
   const shipCellMap = new Map<string, { name: string; sunk: boolean }>()
   for (const ship of board.ships) {
@@ -69,9 +93,19 @@ export function BoardGrid({ board, revealShips, interactive, onCellClick, ghost,
                   key={pulsed ? `${k}-${pulse.seq}` : k}
                   type="button"
                   className={classes.join(' ')}
-                  disabled={disabled}
+                  ref={(node) => {
+                    if (node) cellRefs.current.set(k, node)
+                    else cellRefs.current.delete(k)
+                  }}
+                  aria-disabled={disabled}
+                  tabIndex={focused.row === row && focused.col === col ? 0 : -1}
                   aria-label={`${label} ${coordLabel(coord)}${shot === 'empty' ? '' : ` ${shot}`}`}
-                  onClick={() => onCellClick?.(coord)}
+                  onClick={() => {
+                    if (disabled) return
+                    onCellClick?.(coord)
+                  }}
+                  onFocus={() => setFocused(coord)}
+                  onKeyDown={(event) => onKeyDown(event, coord)}
                   onMouseEnter={() => ghost && setHover(coord)}
                   onMouseLeave={() => ghost && setHover(null)}
                 >

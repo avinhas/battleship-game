@@ -87,6 +87,7 @@ export function playEffect(effect: Effect) {
 }
 
 const STORAGE_KEY = 'battleship:muted'
+const RULES_KEY = 'battleship:rules-dismissed'
 
 export function loadMuted(): boolean {
   if (typeof localStorage === 'undefined') return false
@@ -96,4 +97,14 @@ export function loadMuted(): boolean {
 export function saveMuted(muted: boolean) {
   if (typeof localStorage === 'undefined') return
   localStorage.setItem(STORAGE_KEY, String(muted))
+}
+
+export function loadRulesDismissed(): boolean {
+  if (typeof localStorage === 'undefined') return false
+  return localStorage.getItem(RULES_KEY) === 'true'
+}
+
+export function saveRulesDismissed(dismissed: boolean) {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(RULES_KEY, String(dismissed))
 }

@@ -5,9 +5,10 @@ type Props = {
   state: GameState
   onPlayAgain: () => void
   onNewSetup: () => void
+  onShowHistory: () => void
 }
 
-export function GameOver({ state, onPlayAgain, onNewSetup }: Props) {
+export function GameOver({ state, onPlayAgain, onNewSetup, onShowHistory }: Props) {
   const won = state.winner === 'player'
   const playerAfloat = state.playerBoard.ships.filter((s) => !isSunk(s)).length
   const enemyAfloat = state.aiBoard.ships.filter((s) => !isSunk(s)).length
@@ -56,6 +57,9 @@ export function GameOver({ state, onPlayAgain, onNewSetup }: Props) {
           </button>
           <button type="button" onClick={onNewSetup}>
             New setup
+          </button>
+          <button type="button" onClick={onShowHistory}>
+            History
           </button>
         </div>
       </div>
