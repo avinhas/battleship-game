@@ -160,11 +160,11 @@ button {
   min-height: 40px;
 }
 
-button:hover:not(:disabled) {
+button:hover:not(:disabled):not([aria-disabled='true']) {
   border-color: var(--accent);
 }
 
-button:active:not(:disabled) {
+button:active:not(:disabled):not([aria-disabled='true']) {
   transform: translateY(1px);
 }
 
@@ -296,6 +296,7 @@ button.primary {
   justify-content: center;
 }
 
+/* Unavailable cells stay focusable for arrow-key navigation, but inert to the pointer. */
 .cell[aria-disabled='true'] {
   opacity: 1;
   cursor: default;
