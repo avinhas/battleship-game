@@ -1,5 +1,7 @@
 # Battleship
 
+An earlier build for the same exercise, exploring a React/TypeScript stack. The version I'm presenting is battleship-gamev3, built with a spec-first workflow.
+
 A browser-playable Battleship game: you against a computer opponent. React + TypeScript, no game-logic dependencies.
 
 **Play:** https://avinhas.github.io/battleship-game/
